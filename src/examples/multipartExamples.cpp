@@ -43,6 +43,7 @@ using namespace Windows::Foundation::Numerics;
 using namespace IMF;
 using namespace std;
 using namespace IMATH_NAMESPACE;
+#define PI 3.14159265358979323846
 
 template <class InputPartType, class OutputPartType>
 void
@@ -439,6 +440,478 @@ poopy (unsigned short y)
 
     return (s << 31) | (e << 23) | m;
 }
+inline float
+square (float x)
+{
+    return x * x;
+}
+
+template <typename T>
+void
+getTensor (
+    Array2D<T>& red,
+    Array2D<T>& green,
+    Array2D<T>& blue,
+    Array2D<T>& alpha,
+    Array2D<float>& destR,
+    Array2D<float>& destG,
+    Array2D<float>& destB
+)
+{
+    const float corner_weight = 0.182f;
+    const float center_weight = 1.0f - 2.0f * corner_weight;
+        int height = min (
+            min (red.height (), blue.height ()),
+            min (green.height (), alpha.height ()));
+        int width = min (
+            min (red.width (), blue.width ()),
+            min (green.width (), alpha.width ()));
+        cout << width << endl;
+        cout << height << endl;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int lowX = max (0, x - 1);
+                int hiX  = min (width - 1, x + 1);
+                int lowY = max (0, y - 1);
+                int hiY  = min (height - 1, y + 1);
+
+
+                float red1 = (red[hiY][lowX]);
+                float red2 = (red[y][lowX]);
+                float red3 = (red[lowY][lowX]);
+                float red4 = (red[hiY][hiX]);
+                float red5 = (red[y][hiX]);
+                float red6 = (red[lowY][hiX]);
+                float r    = red1 * -corner_weight + red2 * -center_weight +
+                          red3 * -corner_weight + red4 * corner_weight +
+                          red5 * center_weight + red6 * corner_weight;
+
+                float green1 = (green[hiY][lowX]);
+                float green2 = (green[y][lowX]);
+                float green3 = (green[lowY][lowX]);
+                float green4 = (green[hiY][hiX]);
+                float green5 = (green[y][hiX]);
+                float green6 = (green[lowY][hiX]);
+                float g = green1 * -corner_weight + green2 * -center_weight +
+                          green3 * -corner_weight + green4 * corner_weight +
+                          green5 * center_weight + green6 * corner_weight;
+
+                float blue1 = (blue[hiY][lowX]);
+                float blue2 = (blue[y][lowX]);
+                float blue3 = (blue[lowY][lowX]);
+                float blue4 = (blue[hiY][hiX]);
+                float blue5 = (blue[y][hiX]);
+                float blue6 = (blue[lowY][hiX]);
+                float b     = blue1 * -corner_weight + blue2 * -center_weight +
+                          blue3 * -corner_weight + blue4 * corner_weight +
+                          blue5 * center_weight + blue6 * corner_weight;
+
+                float alpha1 = (alpha[hiY][lowX]);
+                float alpha2 = (alpha[y][lowX]);
+                float alpha3 = (alpha[lowY][lowX]);
+                float alpha4 = (alpha[hiY][hiX]);
+                float alpha5 = (alpha[y][hiX]);
+                float alpha6 = (alpha[lowY][hiX]);
+                float a = alpha1 * -corner_weight + alpha2 * -center_weight +
+                          alpha3 * -corner_weight + alpha4 * corner_weight +
+                          alpha5 * center_weight + alpha6 * corner_weight;
+
+                float4 x_partial_derivative = float4 (r, g, b, a);
+
+                float yR = red[hiY][lowX] * corner_weight +
+                           red[hiY][x] * center_weight +
+                           red[hiY][hiX] * corner_weight +
+                           red[lowY][lowX] * -corner_weight +
+                           red[lowY][x] * -center_weight +
+                           red[lowY][hiX] * -corner_weight;
+
+                float yG = green[hiY][lowX] * corner_weight +
+                           green[hiY][x] * center_weight +
+                           green[hiY][hiX] * corner_weight +
+                           green[lowY][lowX] * -corner_weight +
+                           green[lowY][x] * -center_weight +
+                           green[lowY][hiX] * -corner_weight;
+
+                float yB = blue[hiY][lowX] * corner_weight +
+                           blue[hiY][x] * center_weight +
+                           blue[hiY][hiX] * corner_weight +
+                           blue[lowY][lowX] * -corner_weight +
+                           blue[lowY][x] * -center_weight +
+                           blue[lowY][hiX] * -corner_weight;
+
+                float yA = alpha[hiY][lowX] * corner_weight +
+                           alpha[hiY][x] * center_weight +
+                           alpha[hiY][hiX] * corner_weight +
+                           alpha[lowY][lowX] * -corner_weight +
+                           alpha[lowY][x] * -center_weight +
+                           alpha[lowY][hiX] * -corner_weight;
+
+                float4 y_partial_derivative = float4 (yR, yG, yB, yA);
+
+                float dxdx = dot (x_partial_derivative, x_partial_derivative);
+                float dxdy = dot (x_partial_derivative, y_partial_derivative);
+                float dydy = dot (y_partial_derivative, y_partial_derivative);
+                destR[y][x] = (T) dxdx;
+                destG[y][x] = (T) dxdy;
+                destB[y][x] = (T) dydy;
+            }
+        }
+    
+}
+
+template <typename T>
+void
+getMap (
+    Array2D<float>& red,
+    Array2D<float>& green,
+    Array2D<float>& blue,
+    Array2D<T>& alphaMap,
+    Array2D<float>& destR,
+    Array2D<float>& destG,
+    Array2D<float>& destB,
+    Array2D<float>& destA
+    )
+{
+        const float corner_weight = 0.182f;
+        const float center_weight = 1.0f - 2.0f * corner_weight;
+        int         height        = min (
+            min (red.height (), blue.height ()), green.height ());
+        int width = min (
+            min (red.width (), blue.width ()), green.width ());
+        cout << width << endl;
+        cout << height << endl;
+
+        for (int y = 0; y < height; y++)
+        {
+            cout << y << endl;
+            for (int x = 0; x < width; x++)
+            {
+
+                int   lowX = max (0, x - 1);
+                int   hiX  = min (width - 1, x + 1);
+                int   lowY = max (0, y - 1);
+                int   hiY  = min (height - 1, y + 1);
+                float dxdx = red[y][x];
+                float dxdy = blue[y][x];
+                float dydy = green[y][x];
+
+                // Compute the first and second eigenvalues of the structure tensor using the equations in
+                // section "3.1 Orientation and Anisotropy Estimation" of the paper.
+                float eigenvalue_first_term = (dxdx + dydy) / 2.f;
+                float eigenvalue_square_root_term =
+                    sqrt (square (dxdx - dydy) + 4.0f * square (dxdy)) / 2.0f;
+                float first_eigenvalue =
+                    eigenvalue_first_term + eigenvalue_square_root_term;
+                float second_eigenvalue =
+                    eigenvalue_first_term - eigenvalue_square_root_term;
+
+                // Compute the normalized eigenvector of the structure tensor oriented in direction of the
+                // minimum rate of change using the equations in section "3.1 Orientation and Anisotropy
+                // Estimation" of the paper.
+                float2 eigenvector =
+                    float2 (first_eigenvalue - dxdx, -1.0f * dxdy);
+                float  eigenvector_length = length (eigenvector);
+                float2 unit_eigenvector   = eigenvector_length != 0.0f
+                                                ? eigenvector / eigenvector_length
+                                                : float2 (1.0f);
+
+                // Compute the amount of anisotropy using equations in section "3.1 Orientation and Anisotropy
+                // Estimation" of the paper. The anisotropy ranges from 0 to 1, where 0 corresponds to isotropic
+                // and 1 corresponds to entirely anisotropic regions.
+                float eigenvalue_sum = first_eigenvalue + second_eigenvalue;
+                float eigenvalue_difference =
+                    first_eigenvalue - second_eigenvalue;
+                float anisotropy = eigenvalue_sum > 0.0f
+                                       ? eigenvalue_difference / eigenvalue_sum
+                                       : 0.0f;
+
+                // Map radius
+                float size   = 20.0f;
+                float alpha  = alphaMap[y][x];
+                float radius = alpha * size;
+
+                if (radius == 0.0f)
+                {
+                destR[y][x] = red[y][x];
+                destG[y][x] = green[y][x];
+                destB[y][x] = blue[y][x];
+
+                return;
+                }
+
+                // Compute the width and height of an ellipse that is more width-elongated for high anisotropy
+                // and more circular for low anisotropy, controlled using the eccentricity factor. Since the
+                // anisotropy is in the [0, 1] range, the width factor tends to 1 as the eccentricity tends to
+                // infinity and tends to infinity when the eccentricity tends to zero. This is based on the
+                // equations in section "3.2. Anisotropic Kuwahara Filtering" of the paper.
+                float eccentricity       = 0.5f; // TODO: Add variable for eccentricity
+                float eccentricity_clamp = min (eccentricity, 0.95f);
+                float eccentric_adj      = (1.0f - eccentricity_clamp) * 10.f;
+                float ellipse_width_factor =
+                    (eccentric_adj + anisotropy) / eccentric_adj;
+
+                float ellipse_width  = ellipse_width_factor * radius;
+                float ellipse_height = radius / ellipse_width_factor;
+
+                // Compute the cosine and sine of the angle that the eigenvector makes with the x axis. Since the
+                // eigenvector is normalized, its x and y components are the cosine and sine of the angle it
+                // makes with the x axis.
+                float cosine = unit_eigenvector.x;
+                float sine   = unit_eigenvector.y;
+
+                // Compute an inverse transformation matrix that represents an ellipse of the given width and
+                // height and makes and an angle with the x axis of the given cosine and sine. This is an inverse
+                // matrix, so it transforms the ellipse into a disk of unit radius.
+                float2 inverse_ellipse_matrix_1 (
+                    cosine / ellipse_width, sine / ellipse_width);
+                float2 inverse_ellipse_matrix_2 (
+                    -sine / ellipse_height, cosine / ellipse_height);
+
+                // Compute the bounding box of a zero centered ellipse whose major axis is aligned with the
+                // eigenvector and has the given width and height. This is based on the equations described in:
+                //
+                //   https://iquilezles.org/articles/ellipses/
+                //
+                // Notice that we only compute the upper bound, the lower bound is just negative that since the
+                // ellipse is zero centered. Also notice that we take the ceiling of the bounding box, just to
+                // ensure the filter window is at least 1x1.
+                float2 ellipse_major_axis = ellipse_width * unit_eigenvector;
+                float2 ellipse_minor_axis = float2 (
+                    ellipse_height * unit_eigenvector.y * -1.f,
+                    ellipse_height * unit_eigenvector.x * 1.f);
+
+                Vec2<int> ellipse_bounds = Vec2<int> (
+                    ceil (sqrt (
+                        square (ellipse_major_axis.x) +
+                        square (ellipse_minor_axis.x))),
+                    ceil (sqrt (
+                        square (ellipse_major_axis.y) +
+                        square (ellipse_minor_axis.y))));
+
+                // Compute the overlap polynomial parameters for 8-sector ellipse based on the equations in
+                // section "3 Alternative Weighting Functions" of the polynomial weights paper. More on this
+                // later in the code.
+                const int number_of_sectors               = 8;
+                float     sector_center_overlap_parameter = 2.f / radius;
+                float     sector_envelope_angle =
+                    ((3.f / 2.f) * PI) / number_of_sectors;
+                float cross_sector_overlap_parameter =
+                    (sector_center_overlap_parameter +
+                     cos (sector_envelope_angle)) /
+                    square (sin (sector_envelope_angle));
+
+                // We need to compute the weighted mean of color and squared color of each of the 8 sectors of
+                // the ellipse, so we declare arrays for accumulating those and initialize them in the next code
+                // section.
+                float4 weighted_mean_of_squared_color_of_sectors[8];
+                float4 weighted_mean_of_color_of_sectors[8];
+                float  sum_of_weights_of_sectors[8];
+
+                // The center pixel (0, 0) is exempt from the main loop below for reasons that are explained in
+                // the first if statement in the loop, so we need to accumulate its color, squared color, and
+                // weight separately first. Luckily, the zero coordinates of the center pixel zeros out most of
+                // the complex computations below, and it can easily be shown that the weight for the center
+                // pixel in all sectors is simply (1 / number_of_sectors).
+                float4 center_color          = float4 (
+                    red[y][x], 
+                    green[y][x], 
+                    blue[y][x],
+                    0
+                );
+                float4 center_color_squared  = center_color * center_color;
+                float  center_weight_b       = 1.f / number_of_sectors;
+                float4 weighted_center_color = center_color * center_weight_b;
+                float4 weighted_center_color_squared =
+                    center_color_squared * center_weight_b;
+
+                for (int i = 0; i < number_of_sectors; i++)
+                {
+                weighted_mean_of_squared_color_of_sectors[i] =
+                    weighted_center_color_squared;
+                weighted_mean_of_color_of_sectors[i] = weighted_center_color;
+                sum_of_weights_of_sectors[i]         = center_weight_b;
+                }
+
+                // Loop over the window of pixels inside the bounding box of the ellipse. However, we utilize the
+                // fact that ellipses are mirror symmetric along the horizontal axis, so we reduce the window to
+                // only the upper two quadrants, and compute each two mirrored pixels at the same time using the
+                // same weight as an optimization.
+                for (int j = 0; j <= ellipse_bounds.y; j++)
+                {
+                for (int i = -ellipse_bounds.x; i <= ellipse_bounds.x; i++)
+                {
+
+                    // Since we compute each two mirrored pixels at the same time, we need to also exempt the
+                    // pixels whose x coordinates are negative and their y coordinates are zero, that's because
+                    // those are mirrored versions of the pixels whose x coordinates are positive and their y
+                    // coordinates are zero, and we don't want to compute and accumulate them twice. Moreover, we
+                    // also need to exempt the center pixel with zero coordinates for the same reason, however,
+                    // since the mirror of the center pixel is itself, it need to be accumulated separately,
+                    // hence why we did that in the code section just before this loop.
+                    if (j == 0 && i <= 0) { continue; }
+
+                    // Map the pixels of the ellipse into a unit disk, exempting any points that are not part of
+                    // the ellipse or disk.
+                    float2 disk_point (
+                        (inverse_ellipse_matrix_1.x * i +
+                         inverse_ellipse_matrix_1.y * j),
+                        (inverse_ellipse_matrix_2.x * i +
+                         inverse_ellipse_matrix_2.y * j));
+
+                    float disk_point_length_squared =
+                        dot (disk_point, disk_point);
+                    if (disk_point_length_squared > 1.0f) { continue; }
+
+                    // While each pixel belongs to a single sector in the ellipse, we expand the definition of
+                    // a sector a bit to also overlap with other sectors as illustrated in Figure 8 of the
+                    // polynomial weights paper. So each pixel may contribute to multiple sectors, and thus we
+                    // compute its weight in each of the 8 sectors.
+                    float sector_weights[8];
+
+                    // We evaluate the weighting polynomial at each of the 8 sectors by rotating the disk point
+                    // by 45 degrees and evaluating the weighting polynomial at each incremental rotation. To
+                    // avoid potentially expensive rotations, we utilize the fact that rotations by 90 degrees
+                    // are simply swapping of the coordinates and negating the x component. We also note that
+                    // since the y term of the weighting polynomial is squared, it is not affected by the sign
+                    // and can be computed once for the x and once for the y coordinates. So we compute every
+                    // other even-indexed 4 weights by successive 90 degree rotations as discussed.
+
+                    float2 polynomial = (sector_center_overlap_parameter -
+                                        cross_sector_overlap_parameter) *
+                                            disk_point * disk_point;
+                    sector_weights[0] =
+                        square (max (0.f, disk_point.y + polynomial.x));
+                    sector_weights[2] =
+                        square (max (0.f, -disk_point.x + polynomial.y));
+                    sector_weights[4] =
+                        square (max (0.f, -disk_point.y + polynomial.x));
+                    sector_weights[6] =
+                        square (max (0.f, disk_point.x + polynomial.y));
+
+                    // Then we rotate the disk point by 45 degrees, which is a simple expression involving a
+                    // constant as can be demonstrated by applying a 45 degree rotation matrix.
+                    float M_SQRT1_2 =
+                        1.0f /
+                        sqrt (2.0f); // M_SQRT1_2 = 0.70710678118654752440f
+                    float2 rotated_disk_point =
+                        M_SQRT1_2 * float2 (
+                                        disk_point.x - disk_point.y,
+                                        disk_point.x + disk_point.y);
+
+                    // Finally, we compute every other odd-index 4 weights starting from the 45 degrees rotated disk point.
+                    float2 rotated_polynomial =
+                        (sector_center_overlap_parameter -
+                        cross_sector_overlap_parameter) * rotated_disk_point *
+                            rotated_disk_point;
+                    sector_weights[1] = square (
+                        max (0.f, rotated_disk_point.y + rotated_polynomial.x));
+                    sector_weights[3] = square (max (
+                        0.f, -rotated_disk_point.x + rotated_polynomial.y));
+                    sector_weights[5] = square (max (
+                        0.f, -rotated_disk_point.y + rotated_polynomial.x));
+                    sector_weights[7] = square (
+                        max (0.f, rotated_disk_point.x + rotated_polynomial.y));
+
+                    // We compute a radial Gaussian weighting component such that pixels further away from the
+                    // sector center gets attenuated, and we also divide by the sum of sector weights to
+                    // normalize them, since the radial weight will eventually be multiplied to the sector weight below.
+                    float sector_weights_sum =
+                        sector_weights[0] + sector_weights[1] +
+                        sector_weights[2] + sector_weights[3] +
+                        sector_weights[4] + sector_weights[5] +
+                        sector_weights[6] + sector_weights[7];
+                    float radial_gaussian_weight =
+                        exp (-PI * disk_point_length_squared) /
+                        sector_weights_sum;
+
+                    // Load the color of the pixel and its mirrored pixel and compute their square.
+                    float4 upper_color = float4 (
+                        red[hiY][hiX], green[hiY][hiX], blue[hiY][hiX], 0);
+                    float4 lower_color = float4 (
+                        red[lowY][lowX],
+                        green[lowY][lowX],
+                        blue[lowY][lowX],
+                        0);
+                    float4 upper_color_squared = upper_color * upper_color;
+                    float4 lower_color_squared = lower_color * lower_color;
+
+                    for (int k = 0; k < number_of_sectors; k++)
+                    {
+                        float weight =
+                            sector_weights[k] * radial_gaussian_weight;
+
+                        // Accumulate the pixel to each of the sectors multiplied by the sector weight.
+                        int upper_index = k;
+                        sum_of_weights_of_sectors[upper_index] += weight;
+                        weighted_mean_of_color_of_sectors[upper_index] +=
+                            upper_color * weight;
+                        weighted_mean_of_squared_color_of_sectors
+                            [upper_index] += upper_color_squared * weight;
+
+                        // Accumulate the mirrored pixel to each of the sectors multiplied by the sector weight.
+                        int lower_index =
+                            (k + number_of_sectors / 2) % number_of_sectors;
+                        sum_of_weights_of_sectors[lower_index] += weight;
+                        weighted_mean_of_color_of_sectors[lower_index] +=
+                            lower_color * weight;
+                        weighted_mean_of_squared_color_of_sectors
+                            [lower_index] += lower_color_squared * weight;
+                    }
+                }
+                }
+
+                // Compute the weighted sum of mean of sectors, such that sectors with lower standard deviation
+                // gets more significant weight than sectors with higher standard deviation.
+                float  sum_of_weights = 0.f;
+                float4 weighted_sum   = float4 (0.f);
+                for (int i = 0; i < number_of_sectors; i++)
+                {
+                weighted_mean_of_color_of_sectors[i] /=
+                    sum_of_weights_of_sectors[i];
+                weighted_mean_of_squared_color_of_sectors[i] /=
+                    sum_of_weights_of_sectors[i];
+
+                float4 color_mean = weighted_mean_of_color_of_sectors[i];
+                float4 squared_color_mean =
+                    weighted_mean_of_squared_color_of_sectors[i];
+                float4 non_pos_color_var =
+                    squared_color_mean - color_mean * color_mean;
+                float4 color_variance = float4 (
+                    fabs (non_pos_color_var.w),
+                    fabs (non_pos_color_var.x),
+                    fabs (non_pos_color_var.y),
+                    fabs (non_pos_color_var.z));
+
+                float standard_deviation = dot (
+                    float3 (
+                        sqrt (color_variance.x), sqrt (color_variance.y), sqrt (color_variance.z)),
+                    float3 (1.0f));
+
+                // Compute the sector weight based on the weight function introduced in section "3.3.1
+                // Single-scale Filtering" of the multi-scale paper. Use a threshold of 0.02 to avoid zero
+                // division and avoid artifacts in homogeneous regions as demonstrated in the paper.
+                float sharpness            = 0.5f;
+                float normalized_sharpness = sharpness * 10.0f;
+                float weight =
+                    1.0 /
+                    pow (max (0.02f, standard_deviation), normalized_sharpness);
+
+                sum_of_weights += weight;
+                weighted_sum += color_mean * weight;
+                }
+
+                weighted_sum /= sum_of_weights;
+                //dst() = weighted_sum;
+                destR[y][x] = weighted_sum.x;
+                destG[y][x] = weighted_sum.y;
+                destB[y][x] = weighted_sum.z;
+                destA[y][x] = alpha;
+            }
+        }
+}
 
 template <typename T>
 void
@@ -457,19 +930,19 @@ modifyChannels (list<Array2D<T>>& channels, ChannelList& headderChannels)
     for (list<Array2D<T>>::iterator i = channels.begin (); i != channels.end (); i++)
     {
         cout << "iter" << endl;
-        cout << header.name () << endl;
-        if (std::strncmp (header.name (), "R", 1)) { 
+        cout << header.name () << " at: " << &*i << endl;
+        if (std::strncmp (header.name (), "R", 1) == 0) { 
             red = (Array2D<T>*) &*i;
         }
-        if (std::strncmp (header.name (), "G", 1))
+        if (std::strncmp (header.name (), "G", 1) == 0)
         {
             green = (Array2D<T>*) &*i;
         }
-        if (std::strncmp (header.name (), "B", 1))
+        if (std::strncmp (header.name (), "B", 1) == 0)
         {
             blue = (Array2D<T>*) &*i;
         }
-        if (std::strncmp (header.name (), "A", 1))
+        if (std::strncmp (header.name (), "A", 1) == 0)
         {
             alpha = (Array2D<T>*) &*i;
         }
@@ -495,12 +968,30 @@ modifyChannels (list<Array2D<T>>& channels, ChannelList& headderChannels)
             min (red->width (), blue->width ()), min (green->width (), alpha->width()));
         cout << width << endl;
         cout << height << endl;
-        cout << red[50][50] << endl;
-        cout << red[0][0] << endl;
-        cout << red[1079][1919] << endl;
+        Array2D<T>& trueRed = *red;
+        Array2D<T>& trueGreen = *green;
+        Array2D<T>& trueBlue = *blue;
+        Array2D<T>& trueAlpha = *alpha;
 
+        Array2D<float> tensorR = Array2D<float> (width, height);
+        Array2D<float> tensorG = Array2D<float> (width, height);
+        Array2D<float> tensorB = Array2D<float> (width, height);
+
+        
+        // Array2D<float> mapR = Array2D<float> (width, height);
+        // Array2D<float> mapG = Array2D<float> (width, height);
+        // Array2D<float> mapB = Array2D<float> (width, height);
+        // Array2D<float> mapA = Array2D<float> (width, height);
+
+        cout << "Starting Tensor" << endl;
+        getTensor (
+            trueRed, trueGreen, trueBlue, trueAlpha, tensorR, tensorG, tensorB);
+        // cout << "Tensor Finished, Starting Map" << endl;
+        // getMap (tensorR, tensorG, tensorB, trueAlpha, mapR, mapG, mapB, mapA);
+        cout << "Starting Main" << endl;
         for (int y = 0; y < height; y++)
         {
+            cout << y << endl;
         for (int x = 0; x < width; x++)
             {
                 int lowX = max (0, x - 1);
@@ -508,101 +999,320 @@ modifyChannels (list<Array2D<T>>& channels, ChannelList& headderChannels)
                 int lowY = max (0, y - 1);
                 int hiY  = min (height - 1, y + 1);
 
-                Array2D<T>& trueRed = *red;
-                Array2D<T>& trueGreen = *green;
-                Array2D<T>& trueBlue = *blue;
-                Array2D<T>& trueAlpha = *alpha;
+               // The structure tensor is encoded in a float4 using a column major storage order, as can be seen
+                // in the compositor_kuwahara_anisotropic_compute_structure_tensor.glsl shader
 
+                float dxdx = tensorR[y][x];
+                float dxdy = tensorG[y][x];
+                float dydy = tensorB[y][x];
 
-                float red1 = (trueRed[hiY][lowX]);
-                float red2 = (trueRed[y][lowX]);
-                float red3 = (trueRed[lowY][lowX]);
-                float red4 = (trueRed[hiY][hiX]);
-                float red5 = (trueRed[y][hiX]);
-                float red6 = (trueRed[lowY][hiX]);
-                float r = red1 * -corner_weight +
-                      red2 * -center_weight +
-                      red3 * -corner_weight +
-                      red4 * corner_weight +
-                      red5 * center_weight +
-                      red6 * corner_weight;
+                // Compute the first and second eigenvalues of the structure tensor using the equations in
+                // section "3.1 Orientation and Anisotropy Estimation" of the paper.
+                float eigenvalue_first_term = (dxdx + dydy) / 2.f;
+                float eigenvalue_square_root_term =
+                    sqrt (square (dxdx - dydy) + 4.0f * square (dxdy)) / 2.0f;
+                float first_eigenvalue =
+                    eigenvalue_first_term + eigenvalue_square_root_term;
+                float second_eigenvalue =
+                    eigenvalue_first_term - eigenvalue_square_root_term;
 
-                float green1 = (trueGreen[hiY][lowX]);
-                float green2 = (trueGreen[y][lowX]);
-                float green3 = (trueGreen[lowY][lowX]);
-                float green4 = (trueGreen[hiY][hiX]);
-                float green5 = (trueGreen[y][hiX]);
-                float green6 = (trueGreen[lowY][hiX]);
-                float g = green1 * -corner_weight + green2 * -center_weight +
-                          green3 * -corner_weight + green4 * corner_weight +
-                          green5 * center_weight + green6 * corner_weight;
+                // Compute the normalized eigenvector of the structure tensor oriented in direction of the
+                // minimum rate of change using the equations in section "3.1 Orientation and Anisotropy
+                // Estimation" of the paper.
+                float2 eigenvector =
+                    float2 (first_eigenvalue - dxdx, -1.0f * dxdy);
+                float  eigenvector_length = length (eigenvector);
+                float2 unit_eigenvector   = eigenvector_length != 0.0f
+                                                ? eigenvector / eigenvector_length
+                                                : float2 (1.0f);
 
+                // Compute the amount of anisotropy using equations in section "3.1 Orientation and Anisotropy
+                // Estimation" of the paper. The anisotropy ranges from 0 to 1, where 0 corresponds to isotropic
+                // and 1 corresponds to entirely anisotropic regions.
+                float eigenvalue_sum = first_eigenvalue + second_eigenvalue;
+                float eigenvalue_difference =
+                    first_eigenvalue - second_eigenvalue;
+                float anisotropy = eigenvalue_sum > 0.0f
+                                       ? eigenvalue_difference / eigenvalue_sum
+                                       : 0.0f;
+                float size       = 20.0f;
+                float radius = max (0.0f, size);
+                if (radius == 0.0f)
+                { break;
+                }
+
+                // Compute the width and height of an ellipse that is more width-elongated for high anisotropy
+                // and more circular for low anisotropy, controlled using the eccentricity factor. Since the
+                // anisotropy is in the [0, 1] range, the width factor tends to 1 as the eccentricity tends to
+                // infinity and tends to infinity when the eccentricity tends to zero. This is based on the
+                // equations in section "3.2. Anisotropic Kuwahara Filtering" of the paper.
+                float eccentricity       = 0.5f;
+                float eccentricity_clamp = min (eccentricity, 0.95f);
+                float eccentric_adj      = (1.0f - eccentricity_clamp) * 10.f;
+                float ellipse_width_factor =
+                    (eccentric_adj + anisotropy) / eccentric_adj;
+
+                float ellipse_width  = ellipse_width_factor * radius;
+                float ellipse_height = radius / ellipse_width_factor;
+
+                // Compute the cosine and sine of the angle that the eigenvector makes with the x axis. Since the
+                // eigenvector is normalized, its x and y components are the cosine and sine of the angle it
+                // makes with the x axis.
+                float cosine = unit_eigenvector.x;
+                float sine   = unit_eigenvector.y;
+
+                // Compute an inverse transformation matrix that represents an ellipse of the given width and
+                // height and makes and an angle with the x axis of the given cosine and sine. This is an inverse
+                // matrix, so it transforms the ellipse into a disk of unit radius.
+                float2 inverse_ellipse_matrix_1 (
+                    cosine / ellipse_width, sine / ellipse_width);
+                float2 inverse_ellipse_matrix_2 (
+                    -sine / ellipse_height, cosine / ellipse_height);
+
+                // Compute the bounding box of a zero centered ellipse whose major axis is aligned with the
+                // eigenvector and has the given width and height. This is based on the equations described in:
+                //
+                //   https://iquilezles.org/articles/ellipses/
+                //
+                // Notice that we only compute the upper bound, the lower bound is just negative that since the
+                // ellipse is zero centered. Also notice that we take the ceiling of the bounding box, just to
+                // ensure the filter window is at least 1x1.
+                float2 ellipse_major_axis = ellipse_width * unit_eigenvector;
+                float2 ellipse_minor_axis = float2 (
+                    ellipse_height * unit_eigenvector.y * -1.f,
+                    ellipse_height * unit_eigenvector.x * 1.f);
+
+                Vec2<int> ellipse_bounds = Vec2<int> (
+                    ceil (sqrt (
+                        square (ellipse_major_axis.x) +
+                        square (ellipse_minor_axis.x))),
+                    ceil (sqrt (
+                        square (ellipse_major_axis.y) +
+                        square (ellipse_minor_axis.y))));
+
+                // Compute the overlap polynomial parameters for 8-sector ellipse based on the equations in
+                // section "3 Alternative Weighting Functions" of the polynomial weights paper. More on this
+                // later in the code.
+                const int number_of_sectors               = 8;
+                float     sector_center_overlap_parameter = 2.f / radius;
+                float     sector_envelope_angle =
+                    ((3.f / 2.f) * PI) / number_of_sectors;
+                float cross_sector_overlap_parameter =
+                    (sector_center_overlap_parameter +
+                     cos (sector_envelope_angle)) /
+                    square (sin (sector_envelope_angle));
+
+                // We need to compute the weighted mean of color and squared color of each of the 8 sectors of
+                // the ellipse, so we declare arrays for accumulating those and initialize them in the next code
+                // section.
+                float4 weighted_mean_of_squared_color_of_sectors[8];
+                float4 weighted_mean_of_color_of_sectors[8];
+                float  sum_of_weights_of_sectors[8];
+
+                // The center pixel (0, 0) is exempt from the main loop below for reasons that are explained in
+                // the first if statement in the loop, so we need to accumulate its color, squared color, and
+                // weight separately first. Luckily, the zero coordinates of the center pixel zeros out most of
+                // the complex computations below, and it can easily be shown that the weight for the center
+                // pixel in all sectors is simply (1 / number_of_sectors).
+                float4 center_color =
+                    float4 (trueRed[y][x], trueGreen[y][x], trueBlue[y][x], trueAlpha[y][x]);
+                float4 center_color_squared  = center_color * center_color;
+                float  center_weight_b       = 1.f / number_of_sectors;
+                float4 weighted_center_color = center_color * center_weight_b;
+                float4 weighted_center_color_squared =
+                    center_color_squared * center_weight_b;
+
+                for (int i = 0; i < number_of_sectors; i++)
+                {
+                    weighted_mean_of_squared_color_of_sectors[i] =
+                        weighted_center_color_squared;
+                    weighted_mean_of_color_of_sectors[i] =
+                        weighted_center_color;
+                    sum_of_weights_of_sectors[i] = center_weight_b;
+                }
+
+                // Loop over the window of pixels inside the bounding box of the ellipse. However, we utilize the
+                // fact that ellipses are mirror symmetric along the horizontal axis, so we reduce the window to
+                // only the upper two quadrants, and compute each two mirrored pixels at the same time using the
+                // same weight as an optimization.
+                for (int j = 0; j <= ellipse_bounds.y; j++)
+                {
+                    for (int i = -ellipse_bounds.x; i <= ellipse_bounds.x; i++)
+                    {
+
+                        // Since we compute each two mirrored pixels at the same time, we need to also exempt the
+                        // pixels whose x coordinates are negative and their y coordinates are zero, that's because
+                        // those are mirrored versions of the pixels whose x coordinates are positive and their y
+                        // coordinates are zero, and we don't want to compute and accumulate them twice. Moreover, we
+                        // also need to exempt the center pixel with zero coordinates for the same reason, however,
+                        // since the mirror of the center pixel is itself, it need to be accumulated separately,
+                        // hence why we did that in the code section just before this loop.
+                        if (j == 0 && i <= 0) { continue; }
+
+                        // Map the pixels of the ellipse into a unit disk, exempting any points that are not part of
+                        // the ellipse or disk.
+                        float2 disk_point (
+                            (inverse_ellipse_matrix_1.x * i +
+                             inverse_ellipse_matrix_1.y * j),
+                            (inverse_ellipse_matrix_2.x * i +
+                             inverse_ellipse_matrix_2.y * j));
+
+                        float disk_point_length_squared =
+                            dot (disk_point, disk_point);
+                        if (disk_point_length_squared > 1.0f) { continue; }
+
+                        // While each pixel belongs to a single sector in the ellipse, we expand the definition of
+                        // a sector a bit to also overlap with other sectors as illustrated in Figure 8 of the
+                        // polynomial weights paper. So each pixel may contribute to multiple sectors, and thus we
+                        // compute its weight in each of the 8 sectors.
+                        float sector_weights[8];
+
+                        // We evaluate the weighting polynomial at each of the 8 sectors by rotating the disk point
+                        // by 45 degrees and evaluating the weighting polynomial at each incremental rotation. To
+                        // avoid potentially expensive rotations, we utilize the fact that rotations by 90 degrees
+                        // are simply swapping of the coordinates and negating the x component. We also note that
+                        // since the y term of the weighting polynomial is squared, it is not affected by the sign
+                        // and can be computed once for the x and once for the y coordinates. So we compute every
+                        // other even-indexed 4 weights by successive 90 degree rotations as discussed.
+
+                        float2 polynomial = (sector_center_overlap_parameter -
+                                            cross_sector_overlap_parameter) *
+                                                disk_point * disk_point;
+                        sector_weights[0] =
+                            square (max (0.f, disk_point.y + polynomial.x));
+                        sector_weights[2] =
+                            square (max (0.f, -disk_point.x + polynomial.y));
+                        sector_weights[4] =
+                            square (max (0.f, -disk_point.y + polynomial.x));
+                        sector_weights[6] =
+                            square (max (0.f, disk_point.x + polynomial.y));
+
+                        // Then we rotate the disk point by 45 degrees, which is a simple expression involving a
+                        // constant as can be demonstrated by applying a 45 degree rotation matrix.
+                        float M_SQRT1_2 =
+                            1.0f /
+                            sqrt (2.0f); // M_SQRT1_2 = 0.70710678118654752440f
+                        float2 rotated_disk_point =
+                            M_SQRT1_2 * float2 (
+                                            disk_point.x - disk_point.y,
+                                            disk_point.x + disk_point.y);
+
+                        // Finally, we compute every other odd-index 4 weights starting from the 45 degrees rotated disk point.
+                        float2 rotated_polynomial =
+                            (sector_center_overlap_parameter -
+                            cross_sector_overlap_parameter) *
+                                rotated_disk_point * rotated_disk_point;
+                        sector_weights[1] = square (max (
+                            0.f, rotated_disk_point.y + rotated_polynomial.x));
+                        sector_weights[3] = square (max (
+                            0.f, -rotated_disk_point.x + rotated_polynomial.y));
+                        sector_weights[5] = square (max (
+                            0.f, -rotated_disk_point.y + rotated_polynomial.x));
+                        sector_weights[7] = square (max (
+                            0.f, rotated_disk_point.x + rotated_polynomial.y));
+
+                        // We compute a radial Gaussian weighting component such that pixels further away from the
+                        // sector center gets attenuated, and we also divide by the sum of sector weights to
+                        // normalize them, since the radial weight will eventually be multiplied to the sector weight below.
+                        float sector_weights_sum =
+                            sector_weights[0] + sector_weights[1] +
+                            sector_weights[2] + sector_weights[3] +
+                            sector_weights[4] + sector_weights[5] +
+                            sector_weights[6] + sector_weights[7];
+                        float radial_gaussian_weight =
+                            exp (-PI * disk_point_length_squared) /
+                            sector_weights_sum;
+
+                        // Load the color of the pixel and its mirrored pixel and compute their square.
+                        float4 upper_color = float4 (
+                            trueRed[hiY][hiX], trueGreen[hiY][hiX], trueBlue[hiY][hiX], trueAlpha[hiY][hiX]);
+                        float4 lower_color = float4 (
+                            trueRed[lowY][lowX],
+                            trueGreen[lowY][lowX],
+                            trueBlue[lowY][lowX],
+                            trueAlpha[lowY][lowX]);
+                        float4 upper_color_squared = upper_color * upper_color;
+                        float4 lower_color_squared = lower_color * lower_color;
+
+                        for (int k = 0; k < number_of_sectors; k++)
+                        {
+                            float weight =
+                                sector_weights[k] * radial_gaussian_weight;
+
+                            // Accumulate the pixel to each of the sectors multiplied by the sector weight.
+                            int upper_index = k;
+                            sum_of_weights_of_sectors[upper_index] += weight;
+                            weighted_mean_of_color_of_sectors[upper_index] +=
+                                upper_color * weight;
+                            weighted_mean_of_squared_color_of_sectors
+                                [upper_index] += upper_color_squared * weight;
+
+                            // Accumulate the mirrored pixel to each of the sectors multiplied by the sector weight.
+                            int lower_index =
+                                (k + number_of_sectors / 2) % number_of_sectors;
+                            sum_of_weights_of_sectors[lower_index] += weight;
+                            weighted_mean_of_color_of_sectors[lower_index] +=
+                                lower_color * weight;
+                            weighted_mean_of_squared_color_of_sectors
+                                [lower_index] += lower_color_squared * weight;
+                        }
+                    }
+                }
+
+                // Compute the weighted sum of mean of sectors, such that sectors with lower standard deviation
+                // gets more significant weight than sectors with higher standard deviation.
+                float  sum_of_weights = 0.f;
+                float4 weighted_sum   = float4 (0.f);
+                for (int i = 0; i < number_of_sectors; i++)
+                {
+                    weighted_mean_of_color_of_sectors[i] /=
+                        sum_of_weights_of_sectors[i];
+                    weighted_mean_of_squared_color_of_sectors[i] /=
+                        sum_of_weights_of_sectors[i];
+
+                    float4 color_mean = weighted_mean_of_color_of_sectors[i];
+                    float4 squared_color_mean =
+                        weighted_mean_of_squared_color_of_sectors[i];
+                    float4 non_pos_color_var =
+                        squared_color_mean - color_mean * color_mean;
+                    float4 color_variance = float4 (
+                        fabs (non_pos_color_var.w),
+                        fabs (non_pos_color_var.x),
+                        fabs (non_pos_color_var.y),
+                        fabs (non_pos_color_var.z));
+
+                    float standard_deviation = dot (
+                        float3 (
+                            sqrt (color_variance.x),
+                            sqrt (color_variance.y),
+                            sqrt (color_variance.z)),
+                        float3 (1.0f));
+
+                    // Compute the sector weight based on the weight function introduced in section "3.3.1
+                    // Single-scale Filtering" of the multi-scale paper. Use a threshold of 0.02 to avoid zero
+                    // division and avoid artifacts in homogeneous regions as demonstrated in the paper.
+                    float sharpness            = 0.5f;
+                    float normalized_sharpness = sharpness * 10.0f;
+                    float weight               = 1.0 / pow (
+                                             max (0.02f, standard_deviation),
+                                             normalized_sharpness);
+
+                    sum_of_weights += weight;
+                    weighted_sum += color_mean * weight;
+                }
+
+                weighted_sum /= sum_of_weights;
+                trueRed[y][x] = weighted_sum.x;
+                trueGreen[y][x] = weighted_sum.y;
+                trueBlue[y][x] = weighted_sum.z;
+                trueAlpha[y][x] = center_color.w;
+                    
                 
-                float blue1 = (trueBlue[hiY][lowX]);
-                float blue2 = (trueBlue[y][lowX]);
-                float blue3 = (trueBlue[lowY][lowX]);
-                float blue4 = (trueBlue[hiY][hiX]);
-                float blue5 = (trueBlue[y][hiX]);
-                float blue6 = (trueBlue[lowY][hiX]);
-                float b     = blue1 * -corner_weight + blue2 * -center_weight +
-                          blue3 * -corner_weight + blue4 * corner_weight +
-                          blue5 * center_weight + blue6 * corner_weight;
-
-                
-                float alpha1 = (trueAlpha[hiY][lowX]);
-                float alpha2 = (trueAlpha[y][lowX]);
-                float alpha3 = (trueAlpha[lowY][lowX]);
-                float alpha4 = (trueAlpha[hiY][hiX]);
-                float alpha5 = (trueAlpha[y][hiX]);
-                float alpha6 = (trueAlpha[lowY][hiX]);
-                float a = alpha1 * -corner_weight + alpha2 * -center_weight +
-                          alpha3 * -corner_weight + alpha4 * corner_weight +
-                          alpha5 * center_weight + alpha6 * corner_weight;
-         
-            float4 x_partial_derivative = float4 (r, g, b, a);
-
-            float yR = trueRed[hiY][lowX] * corner_weight +
-                       trueRed[hiY][x] * center_weight +
-                       trueRed[hiY][hiX] * corner_weight +
-                       trueRed[lowY][lowX] * -corner_weight +
-                       trueRed[lowY][x] * -center_weight +
-                       trueRed[lowY][hiX] * -corner_weight;
-
-            float yG = trueGreen[hiY][lowX] * corner_weight +
-                       trueGreen[hiY][x] * center_weight +
-                       trueGreen[hiY][hiX] * corner_weight +
-                       trueGreen[lowY][lowX] * -corner_weight +
-                       trueGreen[lowY][x] * -center_weight +
-                       trueGreen[lowY][hiX] * -corner_weight;
-
-            float yB = trueBlue[hiY][lowX] * corner_weight +
-                       trueBlue[hiY][x] * center_weight +
-                       trueBlue[hiY][hiX] * corner_weight +
-                       trueBlue[lowY][lowX] * -corner_weight +
-                       trueBlue[lowY][x] * -center_weight +
-                       trueBlue[lowY][hiX] * -corner_weight;
-
-            float yA = trueAlpha[hiY][lowX] * corner_weight +
-                       trueAlpha[hiY][x] * center_weight +
-                       trueAlpha[hiY][hiX] * corner_weight +
-                       trueAlpha[lowY][lowX] * -corner_weight +
-                       trueAlpha[lowY][x] * -center_weight +
-                       trueAlpha[lowY][hiX] * -corner_weight;
-
-            float4 y_partial_derivative = float4(yR, yG, yB, yA);
-
-            float dxdx = dot (x_partial_derivative, x_partial_derivative);
-            float dxdy = dot (x_partial_derivative, y_partial_derivative);
-            float dydy = dot (y_partial_derivative, y_partial_derivative);
-            // trueRed[y][x]   = (T) dxdx;
-            // trueGreen[y][x] = (T) dxdy;
-            // trueBlue[y][x]  = (T) dydy;
-            trueRed[y][x] = 0;
-            trueGreen[y][x] = 0;
-            trueBlue[y][x];
             }
         }
     }
+
+    
     
 }
 
@@ -640,6 +1350,7 @@ modifyMultipart ()
     // Every channel of the input file gets modified.
     //
     MultiPartInputFile inputFile ("BG_depthInfo.exr");
+    // MultiPartInputFile inputFile ("rgba3.exr");
 
     std::vector<Header> headers (inputFile.parts ());
 
@@ -709,6 +1420,7 @@ modifyMultipart ()
             }
         }
     }
+    
 }
 
 void
