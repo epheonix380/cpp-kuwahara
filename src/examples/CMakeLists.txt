@@ -37,17 +37,17 @@ add_executable(OpenEXRExamples
   deepTiledExamples.h
   multipartExamples.cpp
   multipartExamples.h
-)
+ "kuwahara.cpp")
 
 target_link_libraries(OpenEXRExamples OpenEXR::OpenEXR)
 set_target_properties(OpenEXRExamples PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-add_executable(deepidexample deepidexample.cpp)
+add_executable(deepidexample deepidexample.cpp "kuwahara.cpp")
 target_link_libraries(deepidexample OpenEXR::OpenEXR)
 
-add_executable(deepidselect deepidselect.cpp)
+add_executable(deepidselect deepidselect.cpp "kuwahara.cpp")
 target_link_libraries(deepidselect OpenEXR::OpenEXR)
 
 

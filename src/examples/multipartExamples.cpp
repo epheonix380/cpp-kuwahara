@@ -36,6 +36,10 @@
 #include <list>
 
 #include "namespaceAlias.h"
+#include <WindowsNumerics.h>
+#include <cstring>
+#include <iostream>
+using namespace Windows::Foundation::Numerics;
 using namespace IMF;
 using namespace std;
 using namespace IMATH_NAMESPACE;
@@ -368,26 +372,238 @@ freeDeepBuffers (list<Array2D<T*>>& channels)
     }
 }
 
+unsigned int
+poopy (unsigned short y)
+{
+
+    int s = (y >> 15) & 0x00000001;
+    int e = (y >> 10) & 0x0000001f;
+    int m = y & 0x000003ff;
+
+    if (e == 0)
+    {
+        if (m == 0)
+        {
+            //
+            // Plus or minus zero
+            //
+
+            return s << 31;
+        }
+        else
+        {
+            //
+            // Denormalized number -- renormalize it
+            //
+
+            while (!(m & 0x00000400))
+            {
+                m <<= 1;
+                e -= 1;
+            }
+
+            e += 1;
+            m &= ~0x00000400;
+        }
+    }
+    else if (e == 31)
+    {
+        if (m == 0)
+        {
+            //
+            // Positive or negative infinity
+            //
+
+            return (s << 31) | 0x7f800000;
+        }
+        else
+        {
+            //
+            // Nan -- preserve sign and significand bits
+            //
+
+            return (s << 31) | 0x7f800000 | (m << 13);
+        }
+    }
+
+    //
+    // Normalized number
+    //
+
+    e = e + (127 - 15);
+    m = m << 13;
+
+    //
+    // Assemble s, e and m.
+    //
+
+    return (s << 31) | (e << 23) | m;
+}
+
 template <typename T>
 void
-modifyChannels (list<Array2D<T>>& channels, T delta)
+modifyChannels (list<Array2D<T>>& channels, ChannelList& headderChannels)
 {
     //
     // Dummy code modifying each pixel by incrementing every channel by a given delta.
     //
-
-    for (auto i = channels.begin (); i != channels.end (); i++)
+    ChannelList::ConstIterator header = headderChannels.begin ();
+    
+    Array2D<T>*                    red   = (Array2D<T>*) nullptr;
+    Array2D<T>*                    green = (Array2D<T>*) nullptr;
+    Array2D<T>*                    blue  = (Array2D<T>*) nullptr;
+    Array2D<T>*                    alpha  = (Array2D<T>*) nullptr;
+    cout << "here" << endl;
+    for (list<Array2D<T>>::iterator i = channels.begin (); i != channels.end (); i++)
     {
-        Array2D<T>& channel = *i;
-
-        for (int y = 0; y < channel.height (); y++)
+        cout << "iter" << endl;
+        cout << header.name () << endl;
+        if (std::strncmp (header.name (), "R", 1)) { 
+            red = (Array2D<T>*) &*i;
+        }
+        if (std::strncmp (header.name (), "G", 1))
         {
-            for (int x = 0; x < channel.width (); x++)
+            green = (Array2D<T>*) &*i;
+        }
+        if (std::strncmp (header.name (), "B", 1))
+        {
+            blue = (Array2D<T>*) &*i;
+        }
+        if (std::strncmp (header.name (), "A", 1))
+        {
+            alpha = (Array2D<T>*) &*i;
+        }
+
+
+        
+        header++;
+    }
+    cout << red << endl;
+    cout << green << endl;
+    cout << blue << endl;
+    cout << alpha << endl;
+
+    const float corner_weight = 0.182f;
+    const float center_weight = 1.0f - 2.0f * corner_weight;
+    if (red != nullptr && blue != nullptr && green != nullptr)
+    {
+        cout << "Here" << endl;
+        int height = min (
+            min (red->height (), blue->height ()),
+            min (green->height (), alpha->height()));
+        int width = min (
+            min (red->width (), blue->width ()), min (green->width (), alpha->width()));
+        cout << width << endl;
+        cout << height << endl;
+        cout << red[50][50] << endl;
+        cout << red[0][0] << endl;
+        cout << red[1079][1919] << endl;
+
+        for (int y = 0; y < height; y++)
+        {
+        for (int x = 0; x < width; x++)
             {
-                channel[y][x] += delta;
+                int lowX = max (0, x - 1);
+                int hiX  = min (width - 1, x + 1);
+                int lowY = max (0, y - 1);
+                int hiY  = min (height - 1, y + 1);
+
+                Array2D<T>& trueRed = *red;
+                Array2D<T>& trueGreen = *green;
+                Array2D<T>& trueBlue = *blue;
+                Array2D<T>& trueAlpha = *alpha;
+
+
+                float red1 = (trueRed[hiY][lowX]);
+                float red2 = (trueRed[y][lowX]);
+                float red3 = (trueRed[lowY][lowX]);
+                float red4 = (trueRed[hiY][hiX]);
+                float red5 = (trueRed[y][hiX]);
+                float red6 = (trueRed[lowY][hiX]);
+                float r = red1 * -corner_weight +
+                      red2 * -center_weight +
+                      red3 * -corner_weight +
+                      red4 * corner_weight +
+                      red5 * center_weight +
+                      red6 * corner_weight;
+
+                float green1 = (trueGreen[hiY][lowX]);
+                float green2 = (trueGreen[y][lowX]);
+                float green3 = (trueGreen[lowY][lowX]);
+                float green4 = (trueGreen[hiY][hiX]);
+                float green5 = (trueGreen[y][hiX]);
+                float green6 = (trueGreen[lowY][hiX]);
+                float g = green1 * -corner_weight + green2 * -center_weight +
+                          green3 * -corner_weight + green4 * corner_weight +
+                          green5 * center_weight + green6 * corner_weight;
+
+                
+                float blue1 = (trueBlue[hiY][lowX]);
+                float blue2 = (trueBlue[y][lowX]);
+                float blue3 = (trueBlue[lowY][lowX]);
+                float blue4 = (trueBlue[hiY][hiX]);
+                float blue5 = (trueBlue[y][hiX]);
+                float blue6 = (trueBlue[lowY][hiX]);
+                float b     = blue1 * -corner_weight + blue2 * -center_weight +
+                          blue3 * -corner_weight + blue4 * corner_weight +
+                          blue5 * center_weight + blue6 * corner_weight;
+
+                
+                float alpha1 = (trueAlpha[hiY][lowX]);
+                float alpha2 = (trueAlpha[y][lowX]);
+                float alpha3 = (trueAlpha[lowY][lowX]);
+                float alpha4 = (trueAlpha[hiY][hiX]);
+                float alpha5 = (trueAlpha[y][hiX]);
+                float alpha6 = (trueAlpha[lowY][hiX]);
+                float a = alpha1 * -corner_weight + alpha2 * -center_weight +
+                          alpha3 * -corner_weight + alpha4 * corner_weight +
+                          alpha5 * center_weight + alpha6 * corner_weight;
+         
+            float4 x_partial_derivative = float4 (r, g, b, a);
+
+            float yR = trueRed[hiY][lowX] * corner_weight +
+                       trueRed[hiY][x] * center_weight +
+                       trueRed[hiY][hiX] * corner_weight +
+                       trueRed[lowY][lowX] * -corner_weight +
+                       trueRed[lowY][x] * -center_weight +
+                       trueRed[lowY][hiX] * -corner_weight;
+
+            float yG = trueGreen[hiY][lowX] * corner_weight +
+                       trueGreen[hiY][x] * center_weight +
+                       trueGreen[hiY][hiX] * corner_weight +
+                       trueGreen[lowY][lowX] * -corner_weight +
+                       trueGreen[lowY][x] * -center_weight +
+                       trueGreen[lowY][hiX] * -corner_weight;
+
+            float yB = trueBlue[hiY][lowX] * corner_weight +
+                       trueBlue[hiY][x] * center_weight +
+                       trueBlue[hiY][hiX] * corner_weight +
+                       trueBlue[lowY][lowX] * -corner_weight +
+                       trueBlue[lowY][x] * -center_weight +
+                       trueBlue[lowY][hiX] * -corner_weight;
+
+            float yA = trueAlpha[hiY][lowX] * corner_weight +
+                       trueAlpha[hiY][x] * center_weight +
+                       trueAlpha[hiY][hiX] * corner_weight +
+                       trueAlpha[lowY][lowX] * -corner_weight +
+                       trueAlpha[lowY][x] * -center_weight +
+                       trueAlpha[lowY][hiX] * -corner_weight;
+
+            float4 y_partial_derivative = float4(yR, yG, yB, yA);
+
+            float dxdx = dot (x_partial_derivative, x_partial_derivative);
+            float dxdy = dot (x_partial_derivative, y_partial_derivative);
+            float dydy = dot (y_partial_derivative, y_partial_derivative);
+            // trueRed[y][x]   = (T) dxdx;
+            // trueGreen[y][x] = (T) dxdy;
+            // trueBlue[y][x]  = (T) dydy;
+            trueRed[y][x] = 0;
+            trueGreen[y][x] = 0;
+            trueBlue[y][x];
             }
         }
     }
+    
 }
 
 template <typename T>
@@ -423,8 +639,7 @@ modifyMultipart ()
     // The parts in the file can be scanline- or tile-based, either flat or deep.
     // Every channel of the input file gets modified.
     //
-
-    MultiPartInputFile inputFile ("multipart.exr");
+    MultiPartInputFile inputFile ("BG_depthInfo.exr");
 
     std::vector<Header> headers (inputFile.parts ());
 
@@ -434,11 +649,13 @@ modifyMultipart ()
     }
 
     MultiPartOutputFile outputFile (
-        "modified.exr", headers.data (), (int) headers.size ());
+        "test_output.exr", headers.data (), (int) headers.size ());
 
     for (int i = 0; i < inputFile.parts (); i++)
     {
         Header& header = headers[i];
+        ChannelList& channel_list = header.channels ();
+
 
         const string& type = header.type ();
 
@@ -450,7 +667,6 @@ modifyMultipart ()
 
             FrameBuffer frameBuffer = setupFramebuffer (
                 header, intChannels, halfChannels, floatChannels);
-
             if (type == SCANLINEIMAGE)
             {
                 InputPart inputPart (inputFile, i);
@@ -469,9 +685,9 @@ modifyMultipart ()
                     inputPart.numYTiles () - 1);
             }
 
-            modifyChannels<uint32_t> (intChannels, 1);
-            modifyChannels<half> (halfChannels, 0.3);
-            modifyChannels<float> (floatChannels, 0.5);
+            modifyChannels < uint32_t>(intChannels, channel_list);
+            modifyChannels<half> (halfChannels, channel_list);
+            modifyChannels<float> (floatChannels, channel_list);
 
             if (type == SCANLINEIMAGE)
             {
@@ -492,78 +708,6 @@ modifyMultipart ()
                     outputPart.numYTiles () - 1);
             }
         }
-        else if (type == DEEPSCANLINE || type == DEEPTILE)
-        {
-            Array2D<uint32_t>        sampleCount;
-            list<Array2D<uint32_t*>> intChannels;
-            list<Array2D<half*>>     halfChannels;
-            list<Array2D<float*>>    floatChannels;
-
-            DeepFrameBuffer frameBuffer = setupDeepFramebuffer (
-                header, sampleCount, intChannels, halfChannels, floatChannels);
-
-            if (type == DEEPSCANLINE)
-            {
-                DeepScanLineInputPart inputPart (inputFile, i);
-                inputPart.setFrameBuffer (frameBuffer);
-                inputPart.readPixelSampleCounts (
-                    header.dataWindow ().min.y, header.dataWindow ().max.y);
-
-                resizeDeepBuffers<uint32_t> (sampleCount, intChannels);
-                resizeDeepBuffers<half> (sampleCount, halfChannels);
-                resizeDeepBuffers<float> (sampleCount, floatChannels);
-
-                inputPart.readPixels (
-                    header.dataWindow ().min.y, header.dataWindow ().max.y);
-            }
-            else
-            {
-                DeepTiledInputPart inputPart (inputFile, i);
-                inputPart.setFrameBuffer (frameBuffer);
-                inputPart.readPixelSampleCounts (
-                    0,
-                    inputPart.numXTiles () - 1,
-                    0,
-                    inputPart.numYTiles () - 1);
-
-                resizeDeepBuffers<uint32_t> (sampleCount, intChannels);
-                resizeDeepBuffers<half> (sampleCount, halfChannels);
-                resizeDeepBuffers<float> (sampleCount, floatChannels);
-
-                inputPart.readTiles (
-                    0,
-                    inputPart.numXTiles () - 1,
-                    0,
-                    inputPart.numYTiles () - 1);
-            }
-
-            modifyDeepChannels<uint32_t> (sampleCount, intChannels, 1);
-            modifyDeepChannels<half> (sampleCount, halfChannels, 0.3);
-            modifyDeepChannels<float> (sampleCount, floatChannels, 0.5);
-
-            if (type == DEEPSCANLINE)
-            {
-                Box2i                  dataWindow = header.dataWindow ();
-                DeepScanLineOutputPart outputPart (outputFile, i);
-                outputPart.setFrameBuffer (frameBuffer);
-                outputPart.writePixels (
-                    dataWindow.max.y - dataWindow.min.y + 1);
-            }
-            else
-            {
-                DeepTiledOutputPart outputPart (outputFile, i);
-                outputPart.setFrameBuffer (frameBuffer);
-                outputPart.writeTiles (
-                    0,
-                    outputPart.numXTiles () - 1,
-                    0,
-                    outputPart.numYTiles () - 1);
-            }
-
-            freeDeepBuffers (intChannels);
-            freeDeepBuffers (halfChannels);
-            freeDeepBuffers (floatChannels);
-        }
     }
 }
 
@@ -571,11 +715,11 @@ void
 multipartExamples ()
 {
     // Read multiple single-part files and write them out as a single multi-part file.
-    combineFiles ();
+  //  combineFiles ();
 
     // Read all parts from a multi-part file, modify each channel of every pixel by incrementing its value, write out as a multi-part file.
-    modifyMultipart ();
+   modifyMultipart ();
 
     // Read a multi-part file and write out as multiple single-part files.
-    splitFiles ();
+    // splitFiles ();
 }
